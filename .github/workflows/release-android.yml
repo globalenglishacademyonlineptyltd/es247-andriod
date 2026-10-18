@@ -1,0 +1,60 @@
+name: Build and publish ES 24/7 Android APK
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Install Android platform and build tools
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build installable debug APK
+        run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK exists and is non-empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          ls -lh "$APK"
+          file "$APK"
+          unzip -t "$APK"
+
+      - name: Publish versioned APK release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-build-${{ github.run_number }}
+          name: Emergency Service 24/7 Android build ${{ github.run_number }}
+          body: |
+            Installable Android debug APK built by GitHub Actions.
+            This app opens the ES 24/7 client portal inside an Android WebView.
+            Requires internet access. Real-device panic and location testing is still required before operational use.
+          make_latest: true
+          files: app/build/outputs/apk/debug/app-debug.apk
