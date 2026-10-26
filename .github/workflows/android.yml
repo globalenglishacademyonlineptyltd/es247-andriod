@@ -1,4 +1,4 @@
-name: Build and publish ES 24/7 Android APK
+name: Build and publish signed ES 24/7 Android APK
 on:
   push:
     branches: [main]
@@ -19,23 +19,49 @@ jobs:
           java-version: '17'
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Build installable APK
-        run: gradle --no-daemon assembleDebug
+      - name: Verify permanent signing secrets are configured
+        env:
+          ES247_KEYSTORE_BASE64: ${{ secrets.ES247_KEYSTORE_BASE64 }}
+          ES247_KEYSTORE_PASSWORD: ${{ secrets.ES247_KEYSTORE_PASSWORD }}
+          ES247_KEY_ALIAS: ${{ secrets.ES247_KEY_ALIAS }}
+          ES247_KEY_PASSWORD: ${{ secrets.ES247_KEY_PASSWORD }}
+        run: |
+          for name in ES247_KEYSTORE_BASE64 ES247_KEYSTORE_PASSWORD ES247_KEY_ALIAS ES247_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub Actions secret: $name. Add all four ES247 signing secrets in repository Settings > Secrets and variables > Actions."
+              exit 1
+            fi
+          done
+          echo "$ES247_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/es247-release.jks"
+          test -s "$RUNNER_TEMP/es247-release.jks"
+          keytool -list -keystore "$RUNNER_TEMP/es247-release.jks" -storepass "$ES247_KEYSTORE_PASSWORD" -alias "$ES247_KEY_ALIAS" >/dev/null
+      - name: Build permanently signed release APK
+        env:
+          ES247_KEYSTORE_FILE: ${{ runner.temp }}/es247-release.jks
+          ES247_KEYSTORE_PASSWORD: ${{ secrets.ES247_KEYSTORE_PASSWORD }}
+          ES247_KEY_ALIAS: ${{ secrets.ES247_KEY_ALIAS }}
+          ES247_KEY_PASSWORD: ${{ secrets.ES247_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+      - name: Verify APK signature
+        run: |
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          apksigner verify --verbose "$APK"
       - name: Publish permanent GitHub Release download
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-latest
           name: ES 24/7 Android App (Latest)
           body: |
-            Latest installable ES 24/7 Android APK.
-            Download app-debug.apk below. This release asset remains available until replaced or deleted.
-          files: app/build/outputs/apk/debug/app-debug.apk
+            Signed ES 24/7 Android release APK.
+            This asset is signed with the persistent ES247 release key so future updates can use the same signing identity.
+          files: app/build/outputs/apk/release/app-release.apk
           overwrite_files: true
           make_latest: true
-      - name: Keep workflow artifact as backup
+      - name: Keep signed workflow artifact as backup
         uses: actions/upload-artifact@v4
         with:
-          name: ES247-Android-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: ES247-Signed-Android-APK
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
