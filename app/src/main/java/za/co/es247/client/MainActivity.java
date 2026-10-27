@@ -42,7 +42,7 @@ public class MainActivity extends Activity {
                 }
             }
         });
-        webView.loadUrl("https://es247-web-production.up.railway.app/client-app");
+        webView.loadUrl("https://securitysolutionses247.co.za/client-app");
     }
 
     @Override
