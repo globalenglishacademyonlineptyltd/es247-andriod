@@ -34,51 +34,48 @@ android {
     }
 }
 
-// The official ES 24/7 artwork is maintained in the web repository.
-// The uploaded file has a .png filename but is actually JPEG data, so
-// convert it to a real PNG before Android's resource compiler sees it.
+// Download the official ES 24/7 artwork from the web repository and convert
+// it to a clean Android-compatible PNG before resource compilation.
 def officialLogoUrl = 'https://raw.githubusercontent.com/globalenglishacademyonlineptyltd/es247-web/main/public/ChatGPT%20Image%20Oct%2028%2C%202026%2C%2012_54_29%20PM.png'
 def officialLogoFile = file('src/main/res/drawable/app_logo.png')
-def officialLogoDownload = file("${buildDir}/official-es247-logo-source")
+def officialLogoSource = file("${buildDir}/official-es247-logo-source")
 
 tasks.register('downloadOfficialEs247Logo') {
     outputs.file(officialLogoFile)
     doLast {
         officialLogoFile.parentFile.mkdirs()
-        officialLogoDownload.parentFile.mkdirs()
+        officialLogoSource.parentFile.mkdirs()
 
         def connection = new URL(officialLogoUrl).openConnection()
         connection.setRequestProperty('User-Agent', 'ES247-Android-Build')
         connection.connect()
         connection.inputStream.withCloseable { input ->
-            officialLogoDownload.withOutputStream { output ->
+            officialLogoSource.withOutputStream { output ->
                 output << input
             }
         }
 
-        if (!officialLogoDownload.exists() || officialLogoDownload.length() == 0) {
+        if (!officialLogoSource.exists() || officialLogoSource.length() == 0) {
             throw new GradleException('Official ES 24/7 logo could not be downloaded.')
         }
 
-        def image = javax.imageio.ImageIO.read(officialLogoDownload)
-        if (image == null) {
-            throw new GradleException('Downloaded ES 24/7 logo is not a readable image.')
+        // Use ImageMagick rather than Java ImageIO so the source artwork is
+        // normalized to a PNG format that AAPT can compile reliably.
+        def magickCheck = ['bash', '-lc', 'command -v magick || command -v convert'].execute()
+        magickCheck.waitFor()
+        def magick = magickCheck.text.trim()
+        if (!magick) {
+            throw new GradleException('ImageMagick is not available on the GitHub Actions runner.')
         }
 
-        def converted = new java.awt.image.BufferedImage(
-            image.width,
-            image.height,
-            java.awt.image.BufferedImage.TYPE_INT_ARGB
-        )
-        def graphics = converted.createGraphics()
-        try {
-            graphics.drawImage(image, 0, 0, null)
-        } finally {
-            graphics.dispose()
-        }
-
-        if (!javax.imageio.ImageIO.write(converted, 'png', officialLogoFile)) {
-            throw new GradleException('Could not convert the official ES 24/7 logo to PNG.')
+        def process = [
+            'bash', '-lc',
+            "${magick} \"${officialLogoSource.absolutePath}\" -auto-orient -resize '1024x1024>' -strip PNG32:\"${officialLogoFile.absolutePath}\""
+        ].execute()
+        process.consumeProcessOutput(System.out, System.err)
+        def exitCode = process.waitFor()
+        if (exitCode != 0 || !officialLogoFile.exists() || officialLogoFile.length() == 0) {
+            throw new GradleException('Could not convert the official ES 24/7 logo to an Android-compatible PNG.')
         }
     }
 }
