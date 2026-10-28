@@ -1,6 +1,15 @@
 # Emergency Service 24/7 — Android client
 
-This repository builds an installable Android app that opens the existing secure ES 24/7 client portal in an Android WebView. The portal/backend remains hosted separately. Internet access is required; location permission is requested when the portal asks for it.
+This repository builds the installable Android client app for the ES 24/7 client portal. The app uses the official custom domain and opens the secure client portal in an Android WebView. Internet access is required; location permission is requested when the portal asks for it.
+
+## Current release
+
+**Version 1.2.0 (versionCode 3)**
+
+The app opens:
+https://securitysolutionses247.co.za/client-app
+
+The Android WebView is configured for JavaScript, DOM storage, cookies/session persistence, secure geolocation, and the client portal's web flows.
 
 ## Permanent signed release
 
@@ -14,7 +23,7 @@ The GitHub Actions workflow builds a release APK signed with a persistent releas
 
 Do not commit the keystore or its passwords to this public repository. Back up the keystore securely. Future app updates must use the same key, or Android will reject them as a signature mismatch.
 
-Once the secrets are configured and a workflow run succeeds, the permanent download is:
+Once the workflow succeeds, the permanent download is:
 https://github.com/globalenglishacademyonlineptyltd/es247-andriod/releases/download/android-latest/app-release.apk
 
 ## Build and verification
