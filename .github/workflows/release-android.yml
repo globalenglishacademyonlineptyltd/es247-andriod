@@ -34,27 +34,28 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build installable debug APK
+      - name: Build installable ES 24/7 APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify APK exists and is non-empty
+      - name: Prepare professional APK filename
         shell: bash
         run: |
           set -euo pipefail
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$APK"
+          SOURCE_APK="app/build/outputs/apk/debug/app-debug.apk"
+          APK="app/build/outputs/apk/debug/ES-24-7-Client-App.apk"
+          test -s "$SOURCE_APK"
+          cp "$SOURCE_APK" "$APK"
           ls -lh "$APK"
           file "$APK"
           unzip -t "$APK"
 
-      - name: Publish versioned APK release
+      - name: Publish latest ES 24/7 app
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-build-${{ github.run_number }}
-          name: Emergency Service 24/7 Android build ${{ github.run_number }}
+          tag_name: android-latest
+          name: Emergency Service 24/7 — Latest Android App
           body: |
-            Installable Android debug APK built by GitHub Actions.
-            This app opens the ES 24/7 client portal inside an Android WebView.
-            Requires internet access. Real-device panic and location testing is still required before operational use.
+            Official ES 24/7 Client App.
+            Installable Android APK for the ES 24/7 client portal.
           make_latest: true
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/debug/ES-24-7-Client-App.apk
