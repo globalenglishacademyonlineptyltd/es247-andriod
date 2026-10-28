@@ -33,3 +33,31 @@ android {
         }
     }
 }
+
+// The official ES 24/7 artwork is maintained in the web repository.
+// Download it at build time so the Android launcher icon uses the exact
+// approved artwork without keeping a separate, potentially stale copy.
+def officialLogoUrl = 'https://raw.githubusercontent.com/globalenglishacademyonlineptyltd/es247-web/main/public/ChatGPT%20Image%20Oct%2028%2C%202026%2C%2012_54_29%20PM.png'
+def officialLogoFile = file('src/main/res/drawable/app_logo.png')
+
+tasks.register('downloadOfficialEs247Logo') {
+    outputs.file(officialLogoFile)
+    doLast {
+        officialLogoFile.parentFile.mkdirs()
+        def connection = new URL(officialLogoUrl).openConnection()
+        connection.setRequestProperty('User-Agent', 'ES247-Android-Build')
+        connection.connect()
+        connection.inputStream.withCloseable { input ->
+            officialLogoFile.withOutputStream { output ->
+                output << input
+            }
+        }
+        if (!officialLogoFile.exists() || officialLogoFile.length() == 0) {
+            throw new GradleException('Official ES 24/7 logo could not be downloaded.')
+        }
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn(tasks.named('downloadOfficialEs247Logo'))
+}
