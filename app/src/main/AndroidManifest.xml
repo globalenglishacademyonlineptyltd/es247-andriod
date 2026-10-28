@@ -5,7 +5,7 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <application
         android:allowBackup="false"
-        android:label="Emergency Service 24/7"
+        android:label="ES 24/7"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:icon="@drawable/app_icon">
