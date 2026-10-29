@@ -1,4 +1,4 @@
-name: Build and publish ES 24/7 Android APK
+name: Build ES 24/7 Android APK (legacy debug artifact)
 
 on:
   push:
@@ -6,56 +6,35 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-and-publish:
+  build-debug:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
-
       - name: Install Android platform and build tools
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-
-      - name: Build installable ES 24/7 APK
+      - name: Build debug APK
         run: gradle --no-daemon assembleDebug
-
-      - name: Prepare professional APK filename
-        shell: bash
-        run: |
-          set -euo pipefail
-          SOURCE_APK="app/build/outputs/apk/debug/app-debug.apk"
-          APK="app/build/outputs/apk/debug/ES-24-7-Client-App.apk"
-          test -s "$SOURCE_APK"
-          cp "$SOURCE_APK" "$APK"
-          ls -lh "$APK"
-          file "$APK"
-          unzip -t "$APK"
-
-      - name: Publish latest ES 24/7 app
-        uses: softprops/action-gh-release@v2
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: android-latest
-          name: Emergency Service 24/7 — Latest Android App
-          body: |
-            Official ES 24/7 Client App.
-            Installable Android APK for the ES 24/7 client portal.
-          make_latest: true
-          files: app/build/outputs/apk/debug/ES-24-7-Client-App.apk
+          name: ES247-Android-Debug-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
