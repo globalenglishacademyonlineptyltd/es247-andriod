@@ -25,6 +25,10 @@ jobs:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - name: Install Android platform and build tools
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Install image conversion tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
