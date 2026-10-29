@@ -201,9 +201,22 @@ public class MainActivity extends Activity {
     private class SessionBridge {
         @JavascriptInterface
         public void sessionEstablished() {
+            // WebView may deliver the fetch response before its Set-Cookie update is
+            // visible through CookieManager. Retry briefly so we do not overwrite the
+            // saved token with an older session cookie.
             runOnUiThread(() -> {
-                CookieManager.getInstance().flush();
-                persistCurrentCookie();
+                new android.os.Handler(getMainLooper()).postDelayed(() -> {
+                    CookieManager.getInstance().flush();
+                    persistCurrentCookie();
+                }, 300);
+                new android.os.Handler(getMainLooper()).postDelayed(() -> {
+                    CookieManager.getInstance().flush();
+                    persistCurrentCookie();
+                }, 1000);
+                new android.os.Handler(getMainLooper()).postDelayed(() -> {
+                    CookieManager.getInstance().flush();
+                    persistCurrentCookie();
+                }, 2500);
             });
         }
 
