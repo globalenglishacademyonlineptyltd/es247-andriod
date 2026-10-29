@@ -89,6 +89,31 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        // Persist the authenticated WebView session before Android backgrounds or kills the app.
+        CookieManager.getInstance().flush();
+        if (webView != null) {
+            webView.onPause();
+        }
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.onResume();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        // Force WebView cookies (including the server's 30-day session cookie) to disk.
+        CookieManager.getInstance().flush();
+        super.onStop();
+    }
+
+    @Override
     public void onBackPressed() {
         if (webView != null && webView.canGoBack()) {
             webView.goBack();
@@ -99,6 +124,8 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        // Flush before destroying the WebView so closing the app doesn't discard session cookies.
+        CookieManager.getInstance().flush();
         if (webView != null) {
             webView.stopLoading();
             webView.setWebChromeClient(null);
