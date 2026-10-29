@@ -33,6 +33,16 @@ public class MainActivity extends Activity {
     private static final String KEY_ALIAS = "es247_session_key";
 
     private WebView webView;
+    private final android.os.Handler sessionHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private boolean sessionPolling = false;
+    private final Runnable sessionPoller = new Runnable() {
+        @Override public void run() {
+            if (!sessionPolling || webView == null) return;
+            CookieManager.getInstance().flush();
+            persistCurrentCookie();
+            sessionHandler.postDelayed(this, 1000);
+        }
+    };
     private GeolocationPermissions.Callback pendingGeoCallback;
     private String pendingGeoOrigin;
 
@@ -66,6 +76,7 @@ public class MainActivity extends Activity {
                 if (url != null && url.startsWith("https://securitysolutionses247.co.za/")) {
                     installSessionHooks(view);
                     persistCurrentCookie();
+                    startSessionPolling();
                 }
             }
         });
@@ -125,6 +136,7 @@ public class MainActivity extends Activity {
                 + "return originalFetch(input,init).then(function(response){"
                 + "if(raw.indexOf('/api/auth/logout')!==-1&&response.ok){window.ES247SessionBridge.sessionCleared();}"
                 + "if(raw.indexOf('/api/auth/login')!==-1&&response.ok){window.ES247SessionBridge.sessionEstablished();}"
+                + "if(raw.indexOf('/api/me')!==-1&&response.ok){window.ES247SessionBridge.sessionEstablished();}"
                 + "if(raw.indexOf('/api/me')!==-1&&response.status===401){window.ES247SessionBridge.sessionCleared();}"
                 + "return response;});};})();";
         view.evaluateJavascript(script, null);
@@ -139,6 +151,18 @@ public class MainActivity extends Activity {
             }
         }
         return null;
+    }
+
+    private void startSessionPolling() {
+        if (sessionPolling) return;
+        sessionPolling = true;
+        sessionHandler.removeCallbacks(sessionPoller);
+        sessionHandler.post(sessionPoller);
+    }
+
+    private void stopSessionPolling() {
+        sessionPolling = false;
+        sessionHandler.removeCallbacks(sessionPoller);
     }
 
     private void persistCurrentCookie() {
@@ -252,6 +276,7 @@ public class MainActivity extends Activity {
     protected void onPause() {
         persistCurrentCookie();
         CookieManager.getInstance().flush();
+        stopSessionPolling();
         if (webView != null) webView.onPause();
         super.onPause();
     }
@@ -259,7 +284,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (webView != null) webView.onResume();
+        if (webView != null) { webView.onResume(); startSessionPolling(); }
     }
 
     @Override
@@ -277,6 +302,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        stopSessionPolling();
         persistCurrentCookie();
         CookieManager.getInstance().flush();
         if (webView != null) {
