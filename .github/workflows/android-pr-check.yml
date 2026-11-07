@@ -1,0 +1,31 @@
+name: Android pull request validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '*.gradle'
+      - 'gradle/**'
+      - '.github/workflows/android-pr-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-debug-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Install image conversion tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+      - name: Build debug APK (no release signing or publishing)
+        run: gradle --no-daemon assembleDebug
