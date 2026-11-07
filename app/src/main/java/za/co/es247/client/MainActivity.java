@@ -121,7 +121,7 @@ public class MainActivity extends Activity {
             return;
         }
 
-        String restoredCookie = savedCookie + "; Path=/; Max-Age=2592000; Secure; HttpOnly; SameSite=Strict";
+        String restoredCookie = savedCookie + "; Path=/; Max-Age=28800; Secure; HttpOnly; SameSite=Strict";
         manager.setCookie(CLIENT_PORTAL_URL, restoredCookie, accepted -> {
             manager.flush();
             webView.post(() -> webView.loadUrl(CLIENT_PORTAL_URL));
