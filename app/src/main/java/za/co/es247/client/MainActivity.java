@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.security.keystore.KeyGenParameterSpec;
@@ -13,6 +14,7 @@ import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -27,6 +29,8 @@ import javax.crypto.spec.GCMParameterSpec;
 public class MainActivity extends Activity {
     private static final int LOCATION_REQUEST = 247;
     private static final String CLIENT_PORTAL_URL = "https://securitysolutionses247.co.za/client-app";
+    private static final String TRUSTED_HOST = "securitysolutionses247.co.za";
+    private static final String TRUSTED_WWW_HOST = "www.securitysolutionses247.co.za";
     private static final String COOKIE_NAME = "es247_session";
     private static final String PREFS_NAME = "es247_secure_session";
     private static final String PREF_COOKIE = "encrypted_cookie";
@@ -46,6 +50,19 @@ public class MainActivity extends Activity {
     private GeolocationPermissions.Callback pendingGeoCallback;
     private String pendingGeoOrigin;
 
+    private boolean isTrustedOrigin(String value) {
+        if (value == null) return false;
+        try {
+            Uri uri = Uri.parse(value);
+            return "https".equalsIgnoreCase(uri.getScheme())
+                    && (TRUSTED_HOST.equalsIgnoreCase(uri.getHost()) || TRUSTED_WWW_HOST.equalsIgnoreCase(uri.getHost()))
+                    && (uri.getPort() == -1 || uri.getPort() == 443)
+                    && uri.getUserInfo() == null;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -63,20 +80,37 @@ public class MainActivity extends Activity {
         settings.setDisplayZoomControls(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
+        settings.setJavaScriptCanOpenWindowsAutomatically(false);
+        settings.setSupportMultipleWindows(false);
 
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
-        cookieManager.setAcceptThirdPartyCookies(webView, true);
+        // The ES 24/7 portal uses first-party cookies; third-party cookies are not needed.
+        cookieManager.setAcceptThirdPartyCookies(webView, false);
 
         webView.addJavascriptInterface(new SessionBridge(), "ES247SessionBridge");
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return request == null || !isTrustedOrigin(request.getUrl().toString());
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return !isTrustedOrigin(url);
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                if (url != null && url.startsWith("https://securitysolutionses247.co.za/")) {
+                if (isTrustedOrigin(url)) {
                     installSessionHooks(view);
                     persistCurrentCookie();
                     startSessionPolling();
+                } else {
+                    stopSessionPolling();
                 }
             }
         });
@@ -84,6 +118,10 @@ public class MainActivity extends Activity {
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin,
                     GeolocationPermissions.Callback callback) {
+                if (!isTrustedOrigin(origin)) {
+                    callback.invoke(origin, false, false);
+                    return;
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                         && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
                             != PackageManager.PERMISSION_GRANTED
@@ -121,7 +159,7 @@ public class MainActivity extends Activity {
             return;
         }
 
-        String restoredCookie = savedCookie + "; Path=/; Max-Age=2592000; Secure; HttpOnly; SameSite=Strict";
+        String restoredCookie = savedCookie + "; Path=/; Max-Age=28800; Secure; HttpOnly; SameSite=Strict";
         manager.setCookie(CLIENT_PORTAL_URL, restoredCookie, accepted -> {
             manager.flush();
             webView.post(() -> webView.loadUrl(CLIENT_PORTAL_URL));
@@ -225,9 +263,6 @@ public class MainActivity extends Activity {
     private class SessionBridge {
         @JavascriptInterface
         public void sessionEstablished() {
-            // WebView may deliver the fetch response before its Set-Cookie update is
-            // visible through CookieManager. Retry briefly so we do not overwrite the
-            // saved token with an older session cookie.
             runOnUiThread(() -> {
                 new android.os.Handler(getMainLooper()).postDelayed(() -> {
                     CookieManager.getInstance().flush();
@@ -259,11 +294,15 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_REQUEST && pendingGeoCallback != null) {
-            boolean granted = false;
-            for (int result : grantResults) {
-                if (result == PackageManager.PERMISSION_GRANTED) {
-                    granted = true;
-                    break;
+            boolean trustedOrigin = isTrustedOrigin(pendingGeoOrigin);
+            boolean granted = trustedOrigin;
+            if (granted) {
+                granted = false;
+                for (int result : grantResults) {
+                    if (result == PackageManager.PERMISSION_GRANTED) {
+                        granted = true;
+                        break;
+                    }
                 }
             }
             pendingGeoCallback.invoke(pendingGeoOrigin, granted, false);
@@ -284,7 +323,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (webView != null) { webView.onResume(); startSessionPolling(); }
+        if (webView != null) {
+            webView.onResume();
+            if (isTrustedOrigin(webView.getUrl())) startSessionPolling();
+        }
     }
 
     @Override
