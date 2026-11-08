@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
     private static final int LOCATION_REQUEST = 247;
     private static final String CLIENT_PORTAL_URL = "https://securitysolutionses247.co.za/client-app";
     private static final String TRUSTED_HOST = "securitysolutionses247.co.za";
+    private static final String TRUSTED_WWW_HOST = "www.securitysolutionses247.co.za";
     private static final String COOKIE_NAME = "es247_session";
     private static final String PREFS_NAME = "es247_secure_session";
     private static final String PREF_COOKIE = "encrypted_cookie";
@@ -54,7 +55,7 @@ public class MainActivity extends Activity {
         try {
             Uri uri = Uri.parse(value);
             return "https".equalsIgnoreCase(uri.getScheme())
-                    && TRUSTED_HOST.equalsIgnoreCase(uri.getHost())
+                    && (TRUSTED_HOST.equalsIgnoreCase(uri.getHost()) || TRUSTED_WWW_HOST.equalsIgnoreCase(uri.getHost()))
                     && (uri.getPort() == -1 || uri.getPort() == 443)
                     && uri.getUserInfo() == null;
         } catch (Exception ignored) {
