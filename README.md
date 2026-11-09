@@ -4,7 +4,7 @@ This repository builds the installable Android client app for the ES 24/7 client
 
 ## Current release
 
-**Version 1.2.0 (versionCode 3)**
+**Version 1.2.2 (versionCode 5)**
 
 The app opens:
 https://securitysolutionses247.co.za/client-app
